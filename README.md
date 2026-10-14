@@ -31,3 +31,8 @@ Todo está en `index.html`. Al inicio del `<script>`:
 ## Publicar con GitHub Pages
 
 *Settings → Pages → Build and deployment → Source: Deploy from a branch → `main` / `/ (root)` → Save.*
+
+## Módulo Dolibarr
+
+La especificación del módulo **fastfoodpos** (botón *PedidosFood* en TakePOS, categorías,
+extrafields, recetas e inventario) está en [`fastfood.md`](fastfood.md).
