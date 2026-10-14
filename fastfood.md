@@ -27,9 +27,10 @@ y cómo funciona el botón **PedidosFood** dentro del POS nativo.
 13. [Devoluciones y anulaciones](#13-devoluciones-y-anulaciones)
 14. [Catálogo de ejemplo](#14-catálogo-de-ejemplo)
 15. [Permisos, idiomas y seguridad](#15-permisos-idiomas-y-seguridad)
-16. [Plan de construcción por fases](#16-plan-de-construcción-por-fases)
-17. [Pruebas de aceptación](#17-pruebas-de-aceptación)
-18. [Lecciones de SabrooskiPOS que aplican aquí](#18-lecciones-de-sabrooskipos-que-aplican-aquí)
+16. [README del módulo (manual de configuración y uso)](#16-readme-del-módulo-manual-de-configuración-y-uso)
+17. [Plan de construcción por fases](#17-plan-de-construcción-por-fases)
+18. [Pruebas de aceptación](#18-pruebas-de-aceptación)
+19. [Lecciones de SabrooskiPOS que aplican aquí](#19-lecciones-de-sabrooskipos-que-aplican-aquí)
 
 ---
 
@@ -125,7 +126,8 @@ custom/fastfoodpos/
 ├── sql/llx_fastfoodpos_condicion.key.sql
 ├── langs/es_ES/fastfoodpos.lang
 ├── langs/en_US/fastfoodpos.lang
-└── README.md
+├── img/readme/                                      ← capturas del manual
+└── README.md                                        ← manual paso a paso de configuración y uso (sección 16, obligatorio)
 ```
 
 ### 3.1 Puntos de enganche con el núcleo
@@ -755,21 +757,307 @@ FfpErrorFacturaNoBorrador = La venta ya fue cobrada; abre una nueva
 
 ---
 
-## 16. Plan de construcción por fases
+## 16. README del módulo (manual de configuración y uso)
+
+El módulo **debe** incluir `custom/fastfoodpos/README.md`: un manual paso a paso para quien
+instala y configura el sistema (implementador o encargado) y para quien lo usa a diario
+(cajero). Es un entregable obligatorio, no opcional: sin él el módulo no se considera terminado.
+
+### 16.1 Reglas del README
+
+- **Idioma:** español, tono directo, en segunda persona ("Entra a…", "Marca…").
+- **Ruta de menú exacta** de Dolibarr 24 en cada paso (**Inicio → Configuración → Módulos**…), en negrita.
+- **Un paso = una acción** con su resultado esperado ("Debes ver…"). Numerado.
+- **Orden obligatorio:** la configuración se hace en el orden de la sección 16.3 (cada paso depende del anterior: no se puede armar una receta sin insumos ni asignar condiciones sin categorías).
+- **Sin IDs fijos:** se nombran categorías y productos, nunca un `rowid`.
+- **Capturas** *(recomendado)* en `img/readme/` con nombre `NN-descripcion.png` y enlazadas en el paso.
+- **Se actualiza con cada versión:** si cambia un ajuste, un menú o un extrafield, el README cambia en el mismo commit. La versión del README = versión del descriptor (`$this->version`).
+- Debe coincidir con este `fastfood.md`; si hay contradicción, se corrige el README.
+
+### 16.2 Índice obligatorio del README
+
+Introducción (qué hace el módulo, 1 párrafo + imagen del popup), y luego:
+
+1. Requisitos
+2. Instalación
+3. Configuración inicial de Dolibarr y TakePOS
+4. Almacén e insumos
+5. Categorías
+6. Productos y recetas
+7. Adicionales y opciones
+8. Condiciones especiales
+9. Configuración de FastFood POS (pestañas y terminales)
+10. Permisos de los cajeros
+11. Carga inicial de inventario
+12. Prueba de control (antes de abrir al público)
+13. Uso diario en el POS (cajero)
+14. Inventario en el día a día (compras, traspasos, mermas, conteos)
+15. Devoluciones
+16. Solución de problemas
+17. Preguntas frecuentes
+18. Actualizar o desinstalar el módulo
+
+### 16.3 Contenido mínimo de cada sección (texto base)
+
+El implementador parte de este texto y lo ajusta a lo que realmente construyó.
+
+~~~markdown
+# FastFood POS — Manual de configuración y uso
+
+Versión del módulo: 1.0 · Dolibarr 24.0.x · TakePOS
+
+FastFood POS agrega al TakePOS el botón **PedidosFood**. Con él tomas pedidos de comida
+rápida en una pantalla táctil (hamburguesas, perros, refrescos, postres, helados), con
+**adicionales** que se cobran, **condiciones** como "Sin cebolla" que no se cobran, y
+**opciones** como el sabor del refresco. El pedido queda en el ticket del TakePOS para cobrar e
+imprimir como siempre. Al cobrar, Dolibarr descuenta del inventario los **insumos** de cada
+receta (pan, carne, queso…), excepto los que el cliente pidió quitar.
+
+## 1. Requisitos
+
+- Dolibarr **24.0** o superior, PHP 8.1+.
+- Usuario **administrador** para configurar.
+- Módulos: Productos, Categorías, Facturas, Stocks, TakePOS. Recomendados: Pedidos a proveedor, Recepciones, Inventarios.
+- El módulo **Lotes/Series** debe estar **desactivado**.
+
+## 2. Instalación
+
+1. Copia la carpeta `fastfoodpos` dentro de `htdocs/custom/` (debe quedar `htdocs/custom/fastfoodpos/core/modules/modFastFoodPOS.class.php`).
+2. Entra a **Inicio → Configuración → Módulos**, busca **FastFood POS** y actívalo.
+   Debes ver el módulo en verde. Al activarlo se crean los campos adicionales, la tabla de condiciones y el permiso.
+3. Si Dolibarr pide activar módulos dependientes (TakePOS, Stocks), acepta.
+
+## 3. Configuración inicial de Dolibarr y TakePOS
+
+1. **Inicio → Configuración → Módulos → Productos (configurar)**: activa **Kits / productos virtuales** = Sí.
+2. **Inicio → Configuración → Módulos → Stocks (configurar)**: decide si permites stock negativo. Recomendado al comenzar: permitirlo, para que una venta no se bloquee por un insumo mal contado.
+3. **Inicio → Configuración → Otras configuraciones**: confirma que **no** existan (o estén en 0)
+   `PRODUIT_SOUSPRODUITS_ALSO_ENABLE_PARENT_STOCK_MOVE` y `PRODUIT_SOUSPRODUITS_ALWAYS_DISABLE_CHILDREN_STOCK_MOVE`.
+4. **TakePOS → Configuración → General**: **Agrupar el mismo producto** = **No**.
+5. **TakePOS → Configuración → Terminal 1** (repite para cada terminal):
+   - Cliente por defecto: "Cliente contado" (créalo si no existe).
+   - Almacén: **Cocina** (se crea en el paso 4.1).
+   - No descontar stock: **No**.
+   - Formas de pago: las que uses (efectivo USD, efectivo Bs, pago móvil, punto).
+
+## 4. Almacén e insumos
+
+1. **Productos → Almacenes → Nuevo almacén**: crea **Cocina** (y **Depósito** si guardas compras aparte).
+2. Crea cada insumo en **Productos → Nuevo producto**:
+   - Ref: `INS-…` (ej. `INS-CEBOLLA`).
+   - **En venta: No** · En compra: Sí.
+   - Unidad: la que compras y cuentas (unidad, kg, L).
+   - Campo **Rol en PedidosFood**: *Insumo*.
+   - Stock límite para alerta: el mínimo que quieres tener.
+3. Asigna cada insumo a su categoría de **FFP · Insumos** (Panadería, Proteínas, Vegetales…).
+
+> Para muchos insumos usa **Herramientas → Importar** con un CSV de productos.
+
+## 5. Categorías
+
+En **Productos → Categorías → Nueva categoría** crea este árbol (los nombres pueden cambiar, la estructura no):
+
+    PedidosFood            ← raíz del POS
+    ├── Hamburguesas
+    ├── Perros calientes
+    ├── Refrescos
+    ├── Postres
+    └── Helados
+    FFP · Adicionales      ← NO va dentro de PedidosFood
+    ├── Adicionales hamburguesa
+    ├── Adicionales perro
+    ├── Adicionales helado
+    └── Adicionales postre
+    FFP · Opciones
+    ├── Sabores refresco
+    ├── Sabores helado
+    └── Frutas jugo
+    FFP · Insumos
+    └── (Panadería, Proteínas, Vegetales, Salsas, Lácteos, Bebidas, Helados, Desechables)
+
+Luego, en **TakePOS → Configuración → General**, elige **PedidosFood** como categoría raíz.
+Debes ver en el POS solo las 5 pestañas, nunca los insumos.
+
+> Opcional: dale un **color** a cada pestaña en la ficha de la categoría; el popup lo usa.
+
+## 6. Productos y recetas
+
+### 6.1 Platos (hamburguesas, perros, postres caseros, helados)
+
+1. **Productos → Nuevo producto**: ref, nombre, **precio de venta**, IVA, **En venta: Sí**.
+2. **Rol en PedidosFood**: *Plato*.
+3. Asígnalo a su pestaña (ej. Hamburguesas).
+4. Pestaña **Kit / Productos virtuales** de la ficha → agrega cada insumo con la cantidad **por unidad vendida** y marca **Incrementar/disminuir stock** (incdec) en todos.
+   Ejemplo Hamburguesa clásica: Pan ×1 · Carne 150 g ×1 · Queso ×1 · Lechuga ×0,02 · Tomate ×0,03 · Cebolla ×0,03 · Salsas ×0,03.
+5. Revisa que el plato **no** tenga stock propio: su stock lo ponen sus insumos.
+
+### 6.2 Productos de reventa (agua, malta, postres empacados)
+
+1. Producto con precio, **En venta: Sí**, **Rol**: *Reventa*, sin kit.
+2. Si quieres que se agregue con un toque: **Al tocarlo en el POS** = *Un toque*.
+
+### 6.3 Productos con sabor a elegir (refresco lata, jugos, helados)
+
+1. Crea el plato (ej. "Refresco lata", precio 1,50) **sin kit** y con **Gestión de stocks = No**.
+2. Llena en su ficha:
+   - **Categoría de opciones**: Sabores refresco.
+   - **Título de las opciones**: Sabor · **Mínimo**: 1 · **Máximo**: 1.
+3. Las recetas van en cada opción (sección 7.2).
+
+## 7. Adicionales y opciones
+
+### 7.1 Adicionales (se cobran)
+
+1. Producto "Queso amarillo (adicional)", precio 0,75, **En venta: Sí**, **Rol**: *Adicional*.
+2. Categoría: **Adicionales hamburguesa**.
+3. Kit: Queso amarillo (insumo) ×1, con incdec.
+
+### 7.2 Opciones (sabores, frutas)
+
+1. Producto "Cola", precio 0,00 (o recargo), **En venta: Sí**, **Rol**: *Opción*.
+2. Categoría: **Sabores refresco**.
+3. Kit: Lata Cola 355 ml ×1, con incdec. Para helado: Helado chocolate (L) ×0,09.
+
+> Adicionales y opciones **no** deben estar dentro de la categoría raíz PedidosFood.
+
+## 8. Condiciones especiales
+
+**Inicio → Configuración → Módulos → FastFood POS → pestaña Condiciones**
+
+1. Elige la pestaña (ej. Hamburguesas) → **Nueva condición**.
+2. Escribe el texto tal como lo leerá cocina: "Sin cebolla".
+3. **Insumo que no se descuenta**: Cebolla. Modo: **Total**.
+4. Para condiciones de solo texto ("Salsas aparte", "Bien cocida") deja el insumo vacío.
+5. Si una condición quita varios insumos ("Sin ensalada" = lechuga + tomate), crea una fila por insumo con **el mismo texto**: el POS mostrará un solo botón.
+6. Usa **Copiar condiciones de otra categoría** para no repetir el trabajo.
+
+## 9. Configuración de FastFood POS
+
+**Inicio → Configuración → Módulos → FastFood POS → Configurar**
+
+Pestaña **General**:
+1. Texto y color del botón (por defecto **PedidosFood**, rojo).
+2. Para cada pestaña del POS:
+   - **Al tocar un producto**: *Abrir ventana* (Hamburguesas, Perros, Postres, Helados) o *Un toque* (Refrescos).
+   - **Categoría de adicionales**: Hamburguesas → Adicionales hamburguesa; Perros → Adicionales perro…
+   - **Máx. adicionales** (0 = sin límite).
+3. Tasa BCV: desde Multimoneda o manual.
+
+Pestaña **Terminal N**: categorías a ocultar en ese terminal (opcional).
+
+> Lo que pongas en la ficha de un producto manda sobre la configuración de su pestaña.
+
+## 10. Permisos de los cajeros
+
+**Usuarios y grupos → Grupo "Cajeros" → Permisos**:
+- TakePOS → Usar el punto de venta.
+- FastFood POS → **Usar PedidosFood**.
+- (Encargado) FastFood POS → Configurar pestañas y condiciones.
+
+## 11. Carga inicial de inventario
+
+Elige una opción:
+- **Inventario inicial**: **Productos → Inventarios → Nuevo** → almacén Cocina → cuenta cada insumo → **Validar**.
+- **Importación**: **Herramientas → Importar → Stock de productos** con CSV (ref, almacén, cantidad).
+- **Corrección manual**: ficha del insumo → **Stock → Corregir stock** (entrada).
+
+## 12. Prueba de control (antes de abrir al público)
+
+1. Anota el stock de Pan, Carne y Cebolla.
+2. En el POS: **PedidosFood → Hamburguesas → Hamburguesa clásica → Sin cebolla → + Queso → cantidad 2 → Agregar → Finalizar pedido**.
+3. El ticket debe mostrar 2 Hamburguesa clásica ("Sin cebolla | Con: Queso amarillo") y 2 Queso amarillo (adicional).
+4. Cobra en efectivo.
+5. Revisa **Productos → Stocks → Movimientos**: Pan −2, Carne −2, Queso −4 (2 de receta + 2 adicionales), Cebolla −0,06 y **+0,06** ("Omitido: Sin cebolla").
+6. Si algo no cuadra, ve a **Solución de problemas** antes de vender.
+
+## 13. Uso diario en el POS (cajero)
+
+1. Abre **TakePOS** y elige la mesa o "Para llevar".
+2. Toca **PedidosFood** (botón rojo en la barra de acciones).
+3. Toca una **pestaña** y luego un **producto**:
+   - Productos con insignia **1 toque** se agregan de inmediato.
+   - Los demás abren su ventana:
+     - **Opción obligatoria** (sabor): elige antes de agregar.
+     - **Condiciones especiales**: toca para marcar en rojo ("✕ Sin cebolla"). No se cobran.
+     - **Adicionales**: + / − por cada unidad del producto. Se cobran.
+     - **Nota para cocina**: texto libre corto.
+     - **Cantidad** y **Agregar al pedido**.
+4. A la derecha ves el **Pedido actual**: puedes **Editar**, **Quitar** o **Vaciar**.
+5. Toca **Finalizar pedido**: el popup se cierra y el ticket del POS muestra todo.
+6. Cobra con **Pagar** como siempre e imprime el ticket.
+
+Reglas para el cajero:
+- No agregues el mismo plato desde la rejilla normal del POS si lleva condiciones o adicionales: usa siempre PedidosFood.
+- Si borras una hamburguesa desde el ticket normal, borra también sus adicionales (o hazlo desde PedidosFood con **Quitar**, que borra todo junto).
+
+## 14. Inventario en el día a día
+
+| Necesito… | Hago… |
+|---|---|
+| Registrar una compra | **Compras → Pedido a proveedor** → validar → **Recepción** en Cocina |
+| Pasar mercancía del depósito a cocina | Ficha del insumo → **Stock → Transferir** |
+| Registrar una merma (se dañó, se cayó) | Ficha del insumo → **Corregir stock (salida)**, etiqueta "Merma: motivo" |
+| Comida del personal | **Corregir stock (salida)**, etiqueta "Consumo interno" |
+| Conteo semanal | **Productos → Inventarios → Nuevo** → contar → validar |
+| Ver qué se omitió por condiciones | **Stocks → Movimientos**, filtro código de inventario `FFP-` |
+| Ver qué falta comprar | **Productos → Stocks → Productos con stock bajo la alerta** |
+
+## 15. Devoluciones
+
+1. **TakePOS → Historial** → abre el ticket → **Nota de crédito**.
+2. Dolibarr reingresa los insumos de las recetas y el módulo corrige lo omitido. No hagas ajustes manuales.
+
+## 16. Solución de problemas
+
+| Síntoma | Causa probable | Solución |
+|---|---|---|
+| No aparece el botón PedidosFood | Falta permiso o la constante de hooks | Revisa permisos; desactiva y reactiva el módulo |
+| El popup sale vacío | Raíz del TakePOS mal elegida | TakePOS → General → categoría raíz = PedidosFood |
+| No aparecen adicionales | Pestaña sin categoría de adicionales, o producto con "Sin adicionales" | Configurar → General; revisa la ficha del producto |
+| No se descuentan insumos | Kits desactivados, incdec sin marcar, terminal con "No descontar stock" o sin almacén | Pasos 3.1, 6.1.4 y 3.5 |
+| Se descuenta la cebolla aunque se pidió "Sin cebolla" | La condición no tiene insumo o el insumo no está en la receta | Pestaña Condiciones; revisa el kit del plato |
+| Error de stock al cobrar | Stock negativo prohibido y falta un insumo | Carga el insumo o permite stock negativo |
+| Una hamburguesa "Sin cebolla" se sumó a una normal | "Agrupar el mismo producto" activo | TakePOS → General → No |
+| El popup muestra una versión vieja | Caché del navegador | Ctrl+F5 |
+
+## 17. Preguntas frecuentes
+
+- **¿Puedo cambiar una receta?** Sí, en el kit del plato. Las ventas anteriores no cambian.
+- **¿Puedo usar el POS sin PedidosFood?** Sí, la rejilla nativa sigue funcionando; solo pierdes condiciones y adicionales.
+- **¿Funciona con varias cajas?** Sí, cada terminal usa su almacén y su configuración.
+- **¿Qué pasa si cierro el popup sin finalizar?** Lo agregado ya está en el ticket; nada se pierde.
+
+## 18. Actualizar o desinstalar
+
+- **Actualizar:** reemplaza la carpeta `custom/fastfoodpos`, luego desactiva y reactiva el módulo. Tus productos, recetas y condiciones se conservan.
+- **Desinstalar:** desactiva el módulo. Los campos adicionales y la tabla de condiciones quedan en la base de datos (no se borran datos de ventas ni de stock).
+~~~
+
+### 16.4 Criterio de aceptación del README
+
+Una persona que **no** participó en el desarrollo instala el módulo en un Dolibarr 24 limpio
+siguiendo solo el README, carga el catálogo de ejemplo (sección 14) y la **prueba de control**
+(paso 12 del README) da los movimientos esperados. Si necesitó preguntar algo, el README se
+corrige.
+
+---
+
+## 17. Plan de construcción por fases
 
 | Fase | Entregable | Criterio de "listo" |
 |---|---|---|
 | **1. Esqueleto** | Descriptor, extrafields, tabla de condiciones, permisos, Setup general, botón PedidosFood que abre un popup vacío | El botón aparece solo con permiso; activar/desactivar el módulo no da errores |
 | **2. Toma de pedido** | `api.php` (`getData`, `getProduct`, `addItem`, `getCart`, `removeItem`, `clearCart`) + `picker.js` portado del demo | Se arma un pedido completo y el ticket nativo lo muestra tras `Refresh()`; cobro nativo OK |
-| **3. Inventario** | Trigger `BILL_VALIDATE` / `BILL_UNVALIDATE` con compensación; `admin/condiciones.php` | Pruebas 17.2 en verde |
-| **4. Pulido** | `updateItem` (Editar), tipo de pedido, número de pedido del día, tasa BCV, "Agotado" | Pruebas 17.3 en verde |
+| **3. Inventario** | Trigger `BILL_VALIDATE` / `BILL_UNVALIDATE` con compensación; `admin/condiciones.php` | Pruebas 18.2 en verde |
+| **4. Pulido** | `updateItem` (Editar), tipo de pedido, número de pedido del día, tasa BCV, "Agotado" | Pruebas 18.3 en verde |
+| **4b. Manual** | `README.md` completo según la sección 16 (se empieza en la fase 1 y se completa aquí) | Criterio 16.4 cumplido |
 | **5. Opcional** | Combos (plato + bebida + papas a precio especial), cambio de insumo ("En vaso" = vaso en vez de cono), comanda separada para cocina, MRP para preparados | — |
 
 ---
 
-## 17. Pruebas de aceptación
+## 18. Pruebas de aceptación
 
-### 17.1 Pedido y factura
+### 18.1 Pedido y factura
 
 1. Usuario sin permiso `fastfoodpos->use` → el botón **no** aparece.
 2. Abrir PedidosFood en una mesa nueva (sin factura) → al agregar un plato se crea `(PROV-POS1-<mesa>)`.
@@ -781,7 +1069,7 @@ FfpErrorFacturaNoBorrador = La venta ya fue cobrada; abre una nueva
 8. Finalizar → el popup se cierra y el ticket nativo se actualiza sin recargar la página.
 9. Agregar un producto desde la rejilla nativa con un ítem personalizado igual ya en el ticket → **no** se mezclan (requiere `TAKEPOS_GROUP_SAME_PRODUCT` = No).
 
-### 17.2 Inventario
+### 18.2 Inventario
 
 1. Stock inicial: Cebolla 1,000 kg; Pan hamb. 10; Carne 10.
 2. Vender y cobrar 2 × Hamburguesa clásica **Sin cebolla**.
@@ -792,7 +1080,7 @@ FfpErrorFacturaNoBorrador = La venta ya fue cobrada; abre una nueva
 7. Terminal con `CASHDESK_NO_DECREASE_STOCK = 1` → no hay movimientos nativos ni compensaciones.
 8. Compra por recepción de 5 kg de cebolla → Cebolla 6,000 y PMP actualizado.
 
-### 17.3 Interfaz
+### 18.3 Interfaz
 
 1. Tablet 1280×800 y teléfono 390 px: sin scroll horizontal; botones táctiles ≥ 44 px.
 2. Editar un ítem conserva opciones, condiciones, adicionales y nota.
@@ -800,7 +1088,7 @@ FfpErrorFacturaNoBorrador = La venta ya fue cobrada; abre una nueva
 
 ---
 
-## 18. Lecciones de SabrooskiPOS que aplican aquí
+## 19. Lecciones de SabrooskiPOS que aplican aquí
 
 1. **Rutas:** a `top_htmlhead()` se le pasan rutas relativas (`/fastfoodpos/css/picker.css`);
    `dol_buildpath()` antepone `DOL_URL_ROOT` y `/custom`. Pasar `DOL_URL_ROOT` delante genera doble prefijo (404).
