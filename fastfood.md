@@ -114,18 +114,23 @@ custom/fastfoodpos/
 ├── class/actions_fastfoodpos.class.php              ← hooks ActionButtons (botón) + addHtmlHeader (abre el popup)
 ├── class/fastfoodcondicion.class.php                ← CRUD de condiciones especiales
 ├── class/fastfoodorder.class.php                    ← lógica de negocio: armar líneas, resolver config, omisiones
+├── class/fastfoodcheck.class.php                    ← chequeos del Diagnóstico
+├── class/fastfoodcatalog.class.php                  ← exportación / importación del catálogo
 ├── picker/index.php                                 ← contenedor del popup (inyecta window.FASTFOODPOS)
 ├── picker/api.php                                   ← endpoints JSON (sección 9.4)
 ├── js/picker.js                                     ← UI del popup (port del demo index.html)
 ├── css/picker.css                                   ← estilos (paleta del demo)
 ├── admin/setup.php                                  ← configuración general y por terminal
 ├── admin/condiciones.php                            ← mantenimiento de condiciones especiales
+├── admin/diagnostico.php                            ← semáforo de requisitos y compatibilidad (sección 8.4)
+├── admin/catalogo.php                               ← exportar / importar el catálogo en JSON (sección 8.5)
 ├── admin/about.php
 ├── lib/fastfoodpos.lib.php                          ← helpers (constantes por terminal, pestañas admin)
 ├── sql/llx_fastfoodpos_condicion.sql
 ├── sql/llx_fastfoodpos_condicion.key.sql
 ├── langs/es_ES/fastfoodpos.lang
 ├── langs/en_US/fastfoodpos.lang
+├── data/catalogo-ejemplo.json                       ← catálogo de la sección 14, listo para importar
 ├── img/readme/                                      ← capturas del manual
 └── README.md                                        ← manual paso a paso de configuración y uso (sección 16, obligatorio)
 ```
@@ -158,6 +163,18 @@ Descriptor (`module_parts`):
 | Depende de | `modTakePos`, `modStock`, `modCategorie` |
 | Dolibarr mínimo | `array(24, 0)` |
 | PHP mínimo | `array(8, 1)` |
+
+### 3.3 Portabilidad
+
+| Qué | Cómo se garantiza |
+|---|---|
+| Sin cambios al core ni a `takepos/` | Solo hooks, un trigger y archivos propios en `custom/fastfoodpos/` |
+| Instalación por copia | Activar el módulo crea extrafields, tabla, permisos, constantes y hooks |
+| Sin IDs ni rutas fijas | Categorías elegidas en Setup; rutas con `dol_buildpath()`; tablas con `MAIN_DB_PREFIX` |
+| Ajustes de Dolibarr que el módulo exige | **Diagnóstico** (8.4, grupos A–C) |
+| Dependencias internas de TakePOS ante actualizaciones | **Diagnóstico** (8.4, grupo D) |
+| Datos del negocio (categorías, recetas, condiciones) | **Exportar / importar catálogo** (8.5) sin IDs, por rutas y refs |
+| Puesta en marcha rápida | `data/catalogo-ejemplo.json` |
 
 ---
 
@@ -348,7 +365,7 @@ orden, activo) con botón "Copiar condiciones de otra categoría".
 
 ## 8. Configuración del módulo (Setup)
 
-`admin/setup.php`, con pestañas **General**, **Terminal 1…N**, **Condiciones**, **Acerca de**
+`admin/setup.php`, con pestañas **General**, **Terminal 1…N**, **Condiciones**, **Diagnóstico**, **Catálogo**, **Acerca de**
 (mismo patrón que SabrooskiPOS: valor por terminal con respaldo en el valor general).
 
 ### 8.1 Constantes
@@ -387,6 +404,220 @@ Claves = ID de la pestaña (Hamburguesas = 12, etc.). Se edita con una tabla en 
 
 Las **condiciones** salen de `llx_fastfoodpos_condicion` filtradas por la pestaña, salvo que el
 producto tenga `ffp_sin_condiciones = 1`.
+
+### 8.4 Pestaña Diagnóstico (`admin/diagnostico.php`)
+
+Revisa en un clic que la instalación cumpla todo lo que el módulo necesita. Cada chequeo da un
+semáforo, un mensaje y un enlace **Corregir** a la pantalla de Dolibarr donde se arregla.
+
+- 🟢 **OK** · 🟡 **Advertencia** (funciona, pero algo puede salir mal) · 🔴 **Error** (el inventario o el botón no funcionarán bien).
+- La lógica vive en `class/fastfoodcheck.class.php` → `FastFoodCheck::runAll()` devuelve
+  `[{grupo, codigo, nivel, mensaje, enlace}]`, para reutilizarla en otros lugares.
+- Si hay algún 🔴, la pestaña **General** del Setup muestra un aviso arriba, y el popup
+  PedidosFood muestra una franja roja **solo a administradores** ("Configuración incompleta: ver Diagnóstico").
+- No bloquea el POS: avisa. Vender con un 🔴 queda a criterio del encargado.
+
+#### A. Plataforma
+
+| Código | Chequeo | Nivel si falla |
+|---|---|---|
+| `DOLI_VERSION` | `DOL_VERSION` ≥ 24.0 | 🔴 |
+| `DOLI_VERSION_TESTED` | Versión mayor > 24 (no probada todavía con este módulo) | 🟡 |
+| `PHP_VERSION` | PHP ≥ 8.1 | 🔴 |
+| `MODULES` | Activos: `product`, `categorie`, `facture`, `stock`, `takepos` | 🔴 |
+| `NO_BATCH` | `productbatch` desactivado | 🔴 |
+| `KITS` | `PRODUIT_SOUSPRODUITS` = 1 | 🔴 |
+| `KIT_PARENT_MOVE` | `PRODUIT_SOUSPRODUITS_ALSO_ENABLE_PARENT_STOCK_MOVE` vacío | 🔴 |
+| `KIT_CHILD_MOVE` | `PRODUIT_SOUSPRODUITS_ALWAYS_DISABLE_CHILDREN_STOCK_MOVE` vacío | 🔴 |
+| `GROUP_SAME` | `TAKEPOS_GROUP_SAME_PRODUCT` vacío | 🔴 |
+| `NEGATIVE_STOCK` | `STOCK_DISALLOW_NEGATIVE_TRANSFER` activo → una venta puede fallar si falta un insumo | 🟡 |
+
+#### B. Instalación del módulo
+
+| Código | Chequeo | Nivel |
+|---|---|---|
+| `HOOKS_CONST` | `MAIN_MODULE_FASTFOODPOS_HOOKS` contiene `takeposfrontend` | 🔴 (solución: desactivar y reactivar) |
+| `TRIGGERS_CONST` | `MAIN_MODULE_FASTFOODPOS_TRIGGERS` = 1 y existe el archivo del trigger | 🔴 |
+| `EXTRAFIELDS` | Existen los extrafields `ffp_*` de `product`, `facturedet` (y `facture` si fase 3) | 🔴 |
+| `TABLE` | Existe `llx_fastfoodpos_condicion` | 🔴 |
+| `PERMS` | Al menos un usuario o grupo activo tiene `fastfoodpos->use` | 🟡 |
+
+#### C. TakePOS y terminales
+
+Para cada terminal `N` de 1 a `TAKEPOS_NUM_TERMINALS`:
+
+| Código | Chequeo | Nivel |
+|---|---|---|
+| `ROOT_CAT` | `TAKEPOS_ROOT_CATEGORY_ID` definida y con al menos una hija | 🔴 |
+| `TERM_N_CUSTOMER` | `CASHDESK_ID_THIRDPARTYN` > 0 y el tercero existe | 🔴 |
+| `TERM_N_WAREHOUSE` | `CASHDESK_ID_WAREHOUSEN` > 0 y el almacén existe y está abierto | 🔴 |
+| `TERM_N_DECREASE` | `CASHDESK_NO_DECREASE_STOCKN` ≠ 1 | 🔴 |
+| `BCV_RATE` | Si `FASTFOODPOS_BCV_SOURCE = multicurrency`: existe tasa de VES con fecha de hoy | 🟡 |
+
+#### D. Compatibilidad con TakePOS (protege ante actualizaciones de Dolibarr)
+
+El módulo usa piezas internas de TakePOS que no son una API pública. Este grupo lee los
+archivos nativos (solo lectura, `file_get_contents`) y confirma que siguen ahí. Si una
+actualización de Dolibarr cambia alguna, el diagnóstico lo dice **antes** de que falle en caja.
+
+| Código | Archivo | Busca | Para qué lo usa el módulo |
+|---|---|---|---|
+| `TP_HOOK_BUTTONS` | `takepos/index.php` | `executeHooks('ActionButtons'` | Botón PedidosFood |
+| `TP_HOOK_CONTEXT` | `takepos/index.php` | `initHooks(array('takeposfrontend'))` | Contexto del hook |
+| `TP_JS_REFRESH` | `takepos/index.php` | `function Refresh(` | Recargar el ticket al cerrar el popup |
+| `TP_JS_PLACE` | `takepos/index.php` | `var place=` | Mesa actual |
+| `TP_PROV_REF` | `takepos/invoice.php` | `(PROV-POS` | Encontrar la factura provisional |
+| `TP_GETPRODUCTS` | `takepos/ajax/ajax.php` | `action == 'getProducts'` | Rejilla de productos |
+| `TP_STOCK_ON_PAY` | `takepos/invoice.php` | `CASHDESK_ID_WAREHOUSE` y `->validate($user` | Descargo al cobrar |
+| `CORE_KIT_PARENT` | `product/stock/class/mouvementstock.class.php` | `PRODUIT_SOUSPRODUITS_ALSO_ENABLE_PARENT_STOCK_MOVE` | El kit no mueve stock del padre |
+
+Todos 🔴 si no se encuentran. Las cadenas buscadas se guardan en un arreglo en la clase,
+con un comentario de la versión donde se verificaron (24.0.2).
+
+#### E. Catálogo
+
+| Código | Chequeo | Nivel |
+|---|---|---|
+| `CAT_INSUMO_IN_ROOT` | Ningún producto con rol *insumo* cuelga de la raíz del TakePOS | 🔴 |
+| `CAT_INSUMO_TOSELL` | Insumos con "En venta = Sí" | 🟡 |
+| `CAT_PLATO_NO_KIT` | Producto con rol *plato* sin receta y con stock gestionado (se descontaría el plato, no sus insumos) | 🟡 |
+| `CAT_KIT_INCDEC` | Componente de receta con `incdec = 0` (no se descontará) | 🔴 |
+| `CAT_KIT_SERVICE_CHILD` | Componente que es servicio o tiene "Gestión de stocks = No" | 🟡 |
+| `CAT_TAB_EXTRAS` | Pestaña con categoría de adicionales inexistente o vacía | 🔴 |
+| `CAT_OPTIONS` | Producto con `ffp_opciones_min` > 0 sin categoría de opciones, o con categoría vacía | 🔴 |
+| `CAT_OPTION_NO_STOCK` | Opción sin receta ni stock (no descuenta nada; válido solo si es intencional) | 🟡 |
+| `CAT_COND_INSUMO` | Condición que apunta a un insumo que no está en ninguna receta de su pestaña | 🟡 |
+| `CAT_PRICE_ZERO` | Plato o adicional con precio 0 | 🟡 |
+
+El resultado del grupo E lista los productos afectados con enlace a su ficha.
+
+#### Cuándo correr el diagnóstico
+
+- Al terminar la instalación y la configuración (paso obligatorio del README).
+- **Después de cada actualización de Dolibarr** (grupo D).
+- Después de importar un catálogo (8.5): se ejecuta solo al terminar la importación.
+
+### 8.5 Pestaña Catálogo: exportar e importar (`admin/catalogo.php`)
+
+Permite llevar **toda la configuración del negocio** de una instalación a otra (de pruebas a
+producción, de un local a una sucursal, o como respaldo antes de cambios grandes) en un solo
+archivo JSON. La lógica vive en `class/fastfoodcatalog.class.php`.
+
+#### Qué se exporta y qué no
+
+| Se exporta | No se exporta (cada instalación tiene lo suyo) |
+|---|---|
+| Árbol de categorías usadas por el módulo (pestañas, adicionales, opciones, insumos) con color y descripción | Terceros, usuarios, permisos |
+| Productos con rol `ffp_*`: ref, nombre, descripción, tipo, precio, base de precio, IVA, en venta / en compra, gestión de stocks, unidad, stock de alerta, extrafields `ffp_*`, categorías | Almacenes y terminales (`CASHDESK_*`) |
+| Recetas (kits): padre, componente, cantidad, `incdec` | **Existencias** (stock): se cargan con inventario o importación nativa (README) |
+| Condiciones especiales | Ventas, facturas, movimientos |
+| Configuración por pestaña (`FASTFOODPOS_TABCONFIG`) y ajustes generales del módulo (botón, color, nota, BCV manual) | Imágenes de productos (fase 5: exportación en ZIP) |
+
+#### Regla clave: nada se referencia por ID
+
+Los `rowid` cambian entre instalaciones. En el archivo:
+
+- las **categorías** se identifican por su **ruta** (`"PedidosFood/Hamburguesas"`, `"FFP · Insumos/Vegetales"`);
+- los **productos** por su **ref**;
+- las **recetas** por ref padre + ref componente;
+- las **condiciones** por ruta de pestaña + texto + ref del insumo;
+- las unidades por su **código** de `c_units` (`KG`, `L`, `P`) y el IVA por su **tasa**.
+
+Al importar, el módulo traduce rutas y refs a los IDs de la instalación destino, y reescribe
+`FASTFOODPOS_TABCONFIG` y los extrafields `ffp_cat_*` con los IDs nuevos.
+
+#### Formato del archivo
+
+`fastfoodpos-catalogo-<AAAAMMDD-HHMM>.json`
+
+```json
+{
+  "schema": "fastfoodpos-catalog",
+  "schema_version": 1,
+  "module_version": "1.0",
+  "dolibarr_version": "24.0.2",
+  "exported_at": "2026-10-14T16:30:00-04:00",
+  "currency": "USD",
+  "root": "PedidosFood",
+  "categories": [
+    {"path": "PedidosFood", "color": "", "description": ""},
+    {"path": "PedidosFood/Hamburguesas", "color": "d62828", "description": ""},
+    {"path": "FFP · Adicionales/Adicionales hamburguesa"},
+    {"path": "FFP · Insumos/Vegetales"}
+  ],
+  "products": [
+    {
+      "ref": "INS-CEBOLLA", "label": "Cebolla", "type": 0,
+      "tosell": 0, "tobuy": 1, "stockable": 1, "unit": "KG", "stock_alert": 2,
+      "price": 0, "price_base_type": "HT", "tva_tx": 16,
+      "categories": ["FFP · Insumos/Vegetales"],
+      "ffp": {"rol": "insumo"}
+    },
+    {
+      "ref": "HAMB-CLASICA", "label": "Hamburguesa clásica", "type": 0,
+      "tosell": 1, "tobuy": 0, "stockable": 1,
+      "price": 5.00, "price_base_type": "TTC", "tva_tx": 16,
+      "categories": ["PedidosFood/Hamburguesas"],
+      "ffp": {"rol": "plato", "modo": 0, "cat_adicionales": null, "max_adicionales": 0, "icono": "🍔"}
+    }
+  ],
+  "recipes": [
+    {"parent": "HAMB-CLASICA", "child": "INS-PAN-HAMB", "qty": 1, "incdec": 1},
+    {"parent": "HAMB-CLASICA", "child": "INS-CEBOLLA", "qty": 0.03, "incdec": 1}
+  ],
+  "conditions": [
+    {"tab": "PedidosFood/Hamburguesas", "label": "Sin cebolla", "insumo": "INS-CEBOLLA", "modo": "total", "qty": null, "position": 10, "active": 1},
+    {"tab": "PedidosFood/Hamburguesas", "label": "Salsas aparte", "insumo": null, "position": 70, "active": 1}
+  ],
+  "tabs": [
+    {"path": "PedidosFood/Hamburguesas", "modo": "ventana", "adicionales": "FFP · Adicionales/Adicionales hamburguesa", "max_adicionales": 0}
+  ],
+  "settings": {
+    "FASTFOODPOS_BUTTON_LABEL": "PedidosFood",
+    "FASTFOODPOS_BUTTON_COLOR": "#d62828",
+    "FASTFOODPOS_NOTE_MAXLEN": "120"
+  }
+}
+```
+
+#### Exportar
+
+1. **Setup → Catálogo → Exportar**.
+2. Opciones: incluir precios (sí/no), incluir productos inactivos (sí/no).
+3. Descarga el JSON. Se exportan solo productos con `ffp_rol` definido y las categorías bajo la
+   raíz del TakePOS y las elegidas en la configuración (adicionales, opciones, insumos).
+
+#### Importar
+
+1. **Setup → Catálogo → Importar** → elegir el archivo.
+2. Elegir el **modo**:
+   - **Simular** *(por defecto)*: no escribe nada; muestra el informe de lo que haría.
+   - **Solo crear lo nuevo**: crea lo que no existe; no toca lo existente.
+   - **Crear y actualizar**: además actualiza productos existentes (misma ref), **reemplaza la
+     receta completa** de cada plato importado y sincroniza condiciones de las pestañas importadas.
+3. Opciones: **no tocar precios** (para sucursales con precios propios), **usar como raíz del
+   TakePOS** la categoría `root` del archivo.
+4. Resultado: informe por tipo (creados / actualizados / sin cambios / errores) y, al final, el
+   **Diagnóstico** completo.
+
+Reglas de la importación:
+
+- **Todo o nada:** una sola transacción; si hay un error, no queda nada a medias.
+- **Validación previa:** `schema` y `schema_version` conocidos; refs no vacías y únicas; cada
+  receta y condición apunta a productos del archivo o ya existentes; tasa de IVA válida para el
+  país de la empresa (`c_tva`); unidad existente (`c_units`); sin recetas circulares.
+- **Moneda distinta** a la de la instalación → advertencia y sugerencia de "no tocar precios".
+- **Categorías:** se crean por ruta (tipo producto) si no existen; nunca se borran.
+- **Productos:** nunca se borran ni se desactivan los que no están en el archivo.
+- Usa las clases nativas (`Categorie::create`, `Product::create/update`, `Product::add_sousproduit`,
+  `ExtraFields` vía `array_options`, `FastFoodCondicion::create`) para respetar triggers y validaciones del núcleo; nada de SQL directo para crear productos.
+- Límite: 5 MB por archivo; permiso `fastfoodpos->config` y usuario administrador.
+
+#### Catálogo de ejemplo incluido
+
+El módulo trae `data/catalogo-ejemplo.json` con el catálogo de la sección 14 (insumos, platos,
+recetas, adicionales, opciones y condiciones). En una instalación nueva se importa en modo
+**Solo crear lo nuevo** para tener un POS funcionando en minutos y luego se ajustan precios y recetas.
 
 ---
 
@@ -795,7 +1026,8 @@ Introducción (qué hace el módulo, 1 párrafo + imagen del popup), y luego:
 15. Devoluciones
 16. Solución de problemas
 17. Preguntas frecuentes
-18. Actualizar o desinstalar el módulo
+18. Copiar la configuración a otro local (exportar / importar)
+19. Actualizar o desinstalar el módulo
 
 ### 16.3 Contenido mínimo de cada sección (texto base)
 
@@ -826,6 +1058,12 @@ receta (pan, carne, queso…), excepto los que el cliente pidió quitar.
 2. Entra a **Inicio → Configuración → Módulos**, busca **FastFood POS** y actívalo.
    Debes ver el módulo en verde. Al activarlo se crean los campos adicionales, la tabla de condiciones y el permiso.
 3. Si Dolibarr pide activar módulos dependientes (TakePOS, Stocks), acepta.
+4. Abre **FastFood POS → Configurar → Diagnóstico**. Es normal ver 🔴 en esta etapa: te dice qué falta.
+   Sigue los pasos 3 a 10 de este manual y vuelve a correrlo al final.
+
+> **¿Ya tienes el catálogo de otro local o quieres el de ejemplo?** Después del paso 3, ve a
+> **FastFood POS → Configurar → Catálogo → Importar** y carga el archivo (o `data/catalogo-ejemplo.json`)
+> en modo *Simular* y luego *Solo crear lo nuevo*. Eso reemplaza los pasos 4 a 9; solo revisa precios y recetas.
 
 ## 3. Configuración inicial de Dolibarr y TakePOS
 
@@ -963,6 +1201,7 @@ Elige una opción:
 
 ## 12. Prueba de control (antes de abrir al público)
 
+0. Corre **FastFood POS → Configurar → Diagnóstico**: no debe haber ningún 🔴.
 1. Anota el stock de Pan, Carne y Cebolla.
 2. En el POS: **PedidosFood → Hamburguesas → Hamburguesa clásica → Sin cebolla → + Queso → cantidad 2 → Agregar → Finalizar pedido**.
 3. El ticket debe mostrar 2 Hamburguesa clásica ("Sin cebolla | Con: Queso amarillo") y 2 Queso amarillo (adicional).
@@ -1009,6 +1248,8 @@ Reglas para el cajero:
 
 ## 16. Solución de problemas
 
+**Primero corre el Diagnóstico** (FastFood POS → Configurar → Diagnóstico): detecta la mayoría de estos casos y te lleva a la pantalla donde se corrigen.
+
 | Síntoma | Causa probable | Solución |
 |---|---|---|
 | No aparece el botón PedidosFood | Falta permiso o la constante de hooks | Revisa permisos; desactiva y reactiva el módulo |
@@ -1027,9 +1268,20 @@ Reglas para el cajero:
 - **¿Funciona con varias cajas?** Sí, cada terminal usa su almacén y su configuración.
 - **¿Qué pasa si cierro el popup sin finalizar?** Lo agregado ya está en el ticket; nada se pierde.
 
-## 18. Actualizar o desinstalar
+## 18. Copiar la configuración a otro local
 
-- **Actualizar:** reemplaza la carpeta `custom/fastfoodpos`, luego desactiva y reactiva el módulo. Tus productos, recetas y condiciones se conservan.
+1. En el local de origen: **Configurar → Catálogo → Exportar** (decide si incluyes precios).
+2. En el local nuevo: instala el módulo y haz los pasos 2 y 3 de este manual.
+3. **Configurar → Catálogo → Importar** → *Simular* → revisa el informe → *Solo crear lo nuevo*
+   (o *Crear y actualizar* si ya tenía catálogo). Marca **no tocar precios** si la sucursal tiene los suyos.
+4. Configura almacén y terminal (paso 3.5), permisos (paso 10) y carga el stock inicial (paso 11).
+5. Corre el **Diagnóstico** y la **prueba de control** (paso 12).
+
+## 19. Actualizar o desinstalar
+
+- **Antes de actualizar:** exporta el catálogo (**Configurar → Catálogo → Exportar**) como respaldo.
+- **Actualizar el módulo:** reemplaza la carpeta `custom/fastfoodpos`, luego desactiva y reactiva el módulo. Tus productos, recetas y condiciones se conservan.
+- **Después de actualizar Dolibarr:** corre el **Diagnóstico** antes de abrir la caja; el grupo *Compatibilidad con TakePOS* avisa si la actualización cambió algo que el módulo usa.
 - **Desinstalar:** desactiva el módulo. Los campos adicionales y la tabla de condiciones quedan en la base de datos (no se borran datos de ventas ni de stock).
 ~~~
 
@@ -1046,10 +1298,11 @@ corrige.
 
 | Fase | Entregable | Criterio de "listo" |
 |---|---|---|
-| **1. Esqueleto** | Descriptor, extrafields, tabla de condiciones, permisos, Setup general, botón PedidosFood que abre un popup vacío | El botón aparece solo con permiso; activar/desactivar el módulo no da errores |
+| **1. Esqueleto** | Descriptor, extrafields, tabla de condiciones, permisos, Setup general, botón PedidosFood que abre un popup vacío, **Diagnóstico grupos A–D** | El botón aparece solo con permiso; activar/desactivar el módulo no da errores |
 | **2. Toma de pedido** | `api.php` (`getData`, `getProduct`, `addItem`, `getCart`, `removeItem`, `clearCart`) + `picker.js` portado del demo | Se arma un pedido completo y el ticket nativo lo muestra tras `Refresh()`; cobro nativo OK |
-| **3. Inventario** | Trigger `BILL_VALIDATE` / `BILL_UNVALIDATE` con compensación; `admin/condiciones.php` | Pruebas 18.2 en verde |
+| **3. Inventario** | Trigger `BILL_VALIDATE` / `BILL_UNVALIDATE` con compensación; `admin/condiciones.php`; **Diagnóstico grupo E** | Pruebas 18.2 en verde |
 | **4. Pulido** | `updateItem` (Editar), tipo de pedido, número de pedido del día, tasa BCV, "Agotado" | Pruebas 18.3 en verde |
+| **4a. Portabilidad** | Exportar / importar catálogo (8.5) y `data/catalogo-ejemplo.json` | Pruebas 18.4 en verde |
 | **4b. Manual** | `README.md` completo según la sección 16 (se empieza en la fase 1 y se completa aquí) | Criterio 16.4 cumplido |
 | **5. Opcional** | Combos (plato + bebida + papas a precio especial), cambio de insumo ("En vaso" = vaso en vez de cono), comanda separada para cocina, MRP para preparados | — |
 
@@ -1085,6 +1338,16 @@ corrige.
 1. Tablet 1280×800 y teléfono 390 px: sin scroll horizontal; botones táctiles ≥ 44 px.
 2. Editar un ítem conserva opciones, condiciones, adicionales y nota.
 3. El equivalente en Bs usa la tasa configurada.
+
+### 18.4 Portabilidad
+
+1. Instalación limpia de Dolibarr 24 → activar el módulo → **Diagnóstico** marca en 🔴 kits, terminal y raíz; tras corregirlos según los enlaces, todo 🟢 salvo el grupo E (catálogo vacío).
+2. Activar `TAKEPOS_GROUP_SAME_PRODUCT` → Diagnóstico 🔴 `GROUP_SAME`; aviso visible en Setup y franja roja en el popup solo para administradores.
+3. Renombrar en una copia de pruebas `function Refresh(` en `takepos/index.php` → 🔴 `TP_JS_REFRESH` (prueba del grupo D; restaurar después).
+4. Importar `data/catalogo-ejemplo.json` en **Simular** → informe sin escribir nada; en **Solo crear lo nuevo** → catálogo creado y Diagnóstico 🟢.
+5. Exportar desde la instalación A e importar en B (IDs distintos) → mismas pestañas, recetas, condiciones y configuración por pestaña; la prueba de control del README da igual en ambas.
+6. Importar un archivo con una receta que apunta a una ref inexistente → error, **nada** se crea (todo o nada).
+7. Reimportar el mismo archivo en **Crear y actualizar** → 0 creados, recetas reemplazadas sin duplicar componentes.
 
 ---
 
