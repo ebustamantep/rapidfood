@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Toma de Pedido - Demo comida rápida</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #d62828;
+    --red-dark: #a51d1d;
+    --yellow: #fcbf49;
+    --yellow-soft: #fff3d6;
+    --ink: #2b2118;
+    --ink-soft: #6b5a4a;
+    --muted: #a08c78;
+    --bg: #fbf6ee;
+    --white: #ffffff;
+    --line: #efe3d1;
+    --green: #2a9d5c;
+    --green-dark: #1f7a47;
+    --shadow: 0 6px 16px rgba(80, 40, 10, 0.12);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; touch-action: manipulation; }
+
+  body {
+    font-family: 'Nunito Sans', sans-serif;
+    background:
+      radial-gradient(circle at 6% 6%, rgba(252,191,73,0.25), transparent 40%),
+      radial-gradient(circle at 96% 92%, rgba(214,40,40,0.10), transparent 45%),
+      var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    min-height: 100dvh;
+    overscroll-behavior-y: none;
+  }
+  .display { font-family: 'Fredoka', sans-serif; }
+  button { font-family: inherit; }
+
+  /* ---------- Topbar ---------- */
+  .topbar {
+    background: var(--red);
+    color: #fff;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 12px max(16px, env(safe-area-inset-left));
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    border-bottom: 5px solid var(--yellow);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand .logo {
+    width: 46px; height: 46px; border-radius: 14px; background: var(--yellow);
+    display: flex; align-items: center; justify-content: center; font-size: 26px;
+    box-shadow: 0 3px 0 var(--red-dark);
+  }
+  .brand h1 { font-size: 25px; margin: 0; letter-spacing: 0.5px; line-height: 1.05; }
+  .brand span.tag { display: block; font-size: 11px; font-weight: 700; color: var(--yellow-soft); letter-spacing: 2px; text-transform: uppercase; }
+
+  .top-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .bcv-box {
+    background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 12px; padding: 6px 12px; display: flex; align-items: center; gap: 8px; font-size: 13px;
+  }
+  .bcv-box input {
+    width: 76px; min-height: 38px; border: none; border-radius: 8px; padding: 4px 6px;
+    font-family: 'Nunito Sans', sans-serif; font-weight: 700; text-align: center; font-size: 15px;
+  }
+
+  /* ---------- Layout ---------- */
+  .layout {
+    display: grid; grid-template-columns: 1fr 360px; gap: 18px; padding: 18px;
+    align-items: start; max-width: 1600px; margin: 0 auto;
+  }
+  .layout > div { min-width: 0; }
+
+  /* ---------- Categorías ---------- */
+  .categories {
+    display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px;
+    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+  }
+  .categories::-webkit-scrollbar { display: none; }
+  .cat-btn {
+    scroll-snap-align: start; flex: 0 0 auto;
+    font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 600;
+    min-height: 48px; padding: 8px 18px; border-radius: 999px;
+    border: 2px solid var(--red); background: #fff; color: var(--red);
+    cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 8px;
+    transition: transform .08s ease, background .15s ease, color .15s ease;
+  }
+  .cat-btn .ico { font-size: 20px; }
+  .cat-btn:active { transform: scale(0.95); }
+  .cat-btn.active { background: var(--red); color: #fff; }
+
+  /* ---------- Grid de productos ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+  .card {
+    background: #fff; border: 2px solid var(--line); border-radius: 18px; padding: 14px;
+    cursor: pointer; text-align: left; box-shadow: var(--shadow);
+    transition: transform .1s ease, border-color .15s ease;
+    display: flex; flex-direction: column; gap: 6px; user-select: none; position: relative;
+  }
+  .card:active { transform: scale(0.97); }
+  .card:hover { border-color: var(--yellow); }
+  .card .swatch {
+    width: 100%; height: 72px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--yellow), #ffe29a);
+    display: flex; align-items: center; justify-content: center; font-size: 38px;
+  }
+  .card h3 { font-family: 'Fredoka', sans-serif; margin: 2px 0 0; font-size: 17px; font-weight: 600; color: var(--ink); }
+  .card p { margin: 0; font-size: 12.5px; color: var(--ink-soft); line-height: 1.4; }
+  .card .price { margin-top: auto; font-weight: 800; font-size: 17px; color: var(--red); }
+  .card .badge {
+    position: absolute; top: 10px; right: 10px; background: var(--green); color: #fff;
+    font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 999px; letter-spacing: .3px;
+  }
+
+  /* ---------- Carrito ---------- */
+  .cart {
+    background: #fff; border-radius: 18px; border: 2px solid var(--line); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; position: sticky; top: 18px; max-height: calc(100vh - 36px);
+  }
+  .cart-head {
+    padding: 14px 16px; border-bottom: 2px dashed var(--line);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .cart-head h2 { margin: 0; font-size: 19px; font-weight: 600; }
+  .cart-head .order-no { font-size: 12px; color: var(--muted); font-weight: 700; }
+  .link-btn {
+    border: none; background: none; color: var(--muted); font-size: 13px; font-weight: 700;
+    cursor: pointer; text-decoration: underline; min-height: 36px; padding: 4px 6px;
+  }
+  .mobile-cart-close { display: none; }
+
+  .order-type { display: flex; gap: 6px; padding: 10px 16px 0; }
+  .order-type button {
+    flex: 1; min-height: 42px; border-radius: 12px; border: 2px solid var(--line); background: #fff;
+    font-weight: 800; color: var(--ink-soft); cursor: pointer; font-size: 13.5px;
+  }
+  .order-type button.active { border-color: var(--ink); background: var(--ink); color: #fff; }
+
+  .cart-lines { padding: 6px 16px; overflow-y: auto; flex: 1; min-height: 140px; }
+  .empty-cart { text-align: center; padding: 28px 10px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+  .bubble {
+    display: inline-block; background: var(--yellow-soft); border: 2px solid var(--yellow);
+    border-radius: 14px; padding: 10px 14px; font-weight: 800; color: var(--ink); margin-bottom: 8px;
+  }
+  .line { border-bottom: 1px solid var(--line); padding: 12px 0; font-size: 13px; }
+  .line-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .line-top strong { font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 15px; }
+  .line-cond { color: var(--red); font-weight: 800; font-size: 12px; margin-top: 3px; line-height: 1.4; }
+  .line-extra { color: var(--ink-soft); font-size: 12px; margin-top: 2px; display: flex; justify-content: space-between; gap: 8px; }
+  .line-note { color: var(--ink-soft); font-size: 12px; margin-top: 3px; font-style: italic; }
+  .line-right { text-align: right; flex-shrink: 0; }
+  .line-total { font-weight: 800; color: var(--ink); white-space: nowrap; font-size: 14px; }
+  .line-actions { display: flex; gap: 2px; justify-content: flex-end; }
+  .line-actions button { border: none; background: none; font-size: 12px; font-weight: 800; cursor: pointer; padding: 6px 4px; min-height: 32px; }
+  .line-edit { color: var(--ink-soft); }
+  .line-remove { color: var(--red); }
+
+  .cart-foot { padding: 12px 16px 16px; border-top: 2px dashed var(--line); }
+  .totals-row { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; color: var(--ink-soft); }
+  .totals-row.grand { font-size: 21px; font-weight: 800; color: var(--ink); margin-top: 6px; }
+  .totals-row.bs { font-size: 13px; color: var(--muted); }
+  .finish-btn {
+    width: 100%; min-height: 56px; margin-top: 12px; border: none; border-radius: 14px;
+    background: var(--green); color: #fff; font-family: 'Fredoka', sans-serif; font-size: 19px; font-weight: 600;
+    cursor: pointer; box-shadow: 0 4px 0 var(--green-dark);
+  }
+  .finish-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--green-dark); }
+  .finish-btn:disabled { background: #cfc6ba; box-shadow: none; cursor: not-allowed; }
+
+  .mobile-cart-toggle { display: none; }
+
+  .footnote { text-align: center; color: var(--muted); font-size: 12px; padding: 0 18px 24px; max-width: 900px; margin: 0 auto; }
+
+  /* ---------- Modal ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(43, 33, 24, 0.55);
+    display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 22px; width: 100%; max-width: 640px; max-height: calc(100dvh - 32px);
+    display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.25); overflow: hidden;
+  }
+  .modal-head { padding: 18px 20px 12px; border-bottom: 2px dashed var(--line); display: flex; gap: 14px; align-items: center; }
+  .modal-head .emoji { width: 56px; height: 56px; border-radius: 14px; background: var(--yellow); display: flex; align-items: center; justify-content: center; font-size: 30px; flex-shrink: 0; }
+  .modal-head h2 { margin: 0; font-size: 22px; font-weight: 600; }
+  .modal-sub { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+  .modal-body { padding: 4px 20px 16px; overflow-y: auto; flex: 1; }
+  .modal-foot { padding: 14px 20px 18px; border-top: 2px dashed var(--line); }
+
+  .section-label {
+    font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 16px; color: var(--ink);
+    margin: 18px 0 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  }
+  .section-label .count { font-family: 'Nunito Sans', sans-serif; font-size: 12px; color: var(--muted); font-weight: 700; }
+  .section-label .count.req { color: var(--red); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    border: 2px solid var(--line); background: #fff; border-radius: 999px; padding: 8px 16px;
+    font-size: 14px; font-weight: 700; color: var(--ink); cursor: pointer; user-select: none; min-height: 44px;
+  }
+  .chip.selected { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .chip.disabled { opacity: 0.35; cursor: not-allowed; }
+  .chip.cond.selected { background: var(--red); border-color: var(--red); }
+  .chip.cond.selected::before { content: "✕ "; }
+
+  .extras { display: flex; flex-direction: column; gap: 8px; }
+  .extra-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    border: 2px solid var(--line); border-radius: 14px; padding: 8px 10px 8px 14px; min-height: 56px;
+  }
+  .extra-row.on { border-color: var(--yellow); background: var(--yellow-soft); }
+  .extra-name { font-weight: 800; font-size: 14px; }
+  .extra-price { font-size: 12px; color: var(--ink-soft); font-weight: 700; }
+  .stepper { display: flex; align-items: center; gap: 8px; }
+  .step-btn {
+    width: 40px; height: 40px; border-radius: 12px; border: 2px solid var(--red); background: #fff;
+    color: var(--red); font-size: 20px; font-weight: 800; cursor: pointer; line-height: 1;
+  }
+  .step-btn:disabled { opacity: .3; cursor: not-allowed; }
+  .step-val { font-family: 'Fredoka', sans-serif; font-size: 18px; min-width: 22px; text-align: center; font-weight: 600; }
+
+  .note-input {
+    width: 100%; min-height: 46px; border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px;
+    font-family: 'Nunito Sans', sans-serif; font-size: 14px; color: var(--ink);
+  }
+  .note-input:focus { outline: none; border-color: var(--yellow); }
+
+  .qty-row { display: flex; align-items: center; gap: 12px; }
+  .qty-row .step-btn { width: 48px; height: 48px; }
+  .qty-row .step-val { font-size: 22px; min-width: 30px; }
+  .qty-row .preview { margin-left: auto; text-align: right; }
+  .qty-row .preview .big { font-weight: 800; font-size: 22px; color: var(--red); }
+  .qty-row .preview .small { font-size: 12px; color: var(--muted); }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 14px; }
+  .btn-ghost {
+    flex: 1; min-height: 52px; border-radius: 14px; border: 2px solid var(--line); background: #fff;
+    color: var(--ink-soft); font-weight: 800; cursor: pointer; font-size: 15px;
+  }
+  .btn-primary {
+    flex: 2; min-height: 52px; border-radius: 14px; border: none; background: var(--red); color: #fff;
+    font-family: 'Fredoka', sans-serif; font-weight: 600; font-size: 18px; cursor: pointer; box-shadow: 0 4px 0 var(--red-dark);
+  }
+  .btn-primary:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--red-dark); }
+  .warn { color: var(--red); font-weight: 800; font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+  /* ---------- Comanda (ticket de cocina) ---------- */
+  .ticket {
+    font-family: 'Courier New', monospace; background: #fffdf8; border: 2px dashed var(--line);
+    border-radius: 12px; padding: 14px 16px; font-size: 13.5px; line-height: 1.45; margin-top: 12px;
+  }
+  .ticket .t-head { text-align: center; font-weight: 700; border-bottom: 1px dashed #c9b9a3; padding-bottom: 6px; margin-bottom: 8px; }
+  .ticket .t-line { margin-bottom: 8px; }
+  .ticket .t-cond { color: var(--red); font-weight: 700; padding-left: 18px; }
+  .ticket .t-sub { padding-left: 18px; }
+  .check-circle {
+    width: 64px; height: 64px; border-radius: 50%; background: var(--green); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 34px; margin: 4px auto 8px;
+  }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: #fff; font-weight: 800; padding: 12px 22px; border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25); opacity: 0; transition: opacity .25s ease, transform .25s ease;
+    z-index: 80; pointer-events: none; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: 1fr 320px; }
+  }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; padding: 12px 12px 90px; }
+    .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .card .swatch { height: 60px; }
+    .cart {
+      position: fixed; inset: 0; top: auto; max-height: 92dvh; border-radius: 22px 22px 0 0;
+      transform: translateY(105%); transition: transform .25s ease; z-index: 40;
+    }
+    .cart.mobile-open { transform: translateY(0); }
+    .mobile-cart-close { display: inline-block; }
+    .mobile-cart-toggle {
+      display: flex; justify-content: space-between; align-items: center;
+      position: fixed; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom));
+      min-height: 58px; border: none; border-radius: 16px; background: var(--ink); color: #fff;
+      font-weight: 800; font-size: 15px; padding: 0 18px; z-index: 30; box-shadow: 0 8px 20px rgba(0,0,0,0.25); cursor: pointer;
+    }
+    .mobile-cart-total { color: var(--yellow); font-size: 18px; }
+    .overlay { padding: 0; align-items: flex-end; }
+    .modal { max-width: none; border-radius: 22px 22px 0 0; max-height: 94dvh; }
+    .brand h1 { font-size: 21px; }
+    .toast { top: max(16px, env(safe-area-inset-top)); bottom: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">🍔</div>
+    <div>
+      <h1 class="display">TOMA DE PEDIDO</h1>
+      <span class="tag">Comida rápida · Demo táctil</span>
+    </div>
+  </div>
+  <div class="top-right">
+    <div class="bcv-box">
+      Tasa BCV (Bs/USD)
+      <input id="bcvRate" type="number" value="200" min="1" step="0.01" aria-label="Tasa BCV">
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <div>
+    <div class="categories" id="categories"></div>
+    <div class="grid" id="productGrid"></div>
+  </div>
+
+  <aside class="cart" id="cartPanel">
+    <div class="cart-head">
+      <div>
+        <h2 class="display">Pedido actual</h2>
+        <div class="order-no" id="orderNo"></div>
+      </div>
+      <div>
+        <button class="link-btn mobile-cart-close" id="mobileCartClose" type="button">Seguir pidiendo</button>
+        <button class="link-btn" id="clearCart" type="button">Vaciar</button>
+      </div>
+    </div>
+    <div class="order-type" id="orderType">
+      <button type="button" data-type="Comer aquí" class="active">🍽️ Comer aquí</button>
+      <button type="button" data-type="Para llevar">🛍️ Para llevar</button>
+    </div>
+    <div class="cart-lines" id="cartLines"></div>
+    <div class="cart-foot">
+      <div class="totals-row"><span>Artículos</span><span id="itemCount">0</span></div>
+      <div class="totals-row grand"><span>Total</span><span id="totalUsd">$0.00</span></div>
+      <div class="totals-row bs"><span>Equivalente</span><span id="totalBs">Bs 0,00</span></div>
+      <button class="finish-btn" id="finishBtn" type="button" disabled>Finalizar pedido</button>
+    </div>
+  </aside>
+</div>
+
+<button class="mobile-cart-toggle" id="mobileCartToggle" type="button" aria-expanded="false">
+  <span id="mobileCartLabel">Pedido vacío</span>
+  <span class="mobile-cart-total" id="mobileCartTotal">$0.00</span>
+</button>
+
+<p class="footnote">
+  Demo estática de referencia visual para el botón "Toma de Pedido" del TakePOS de Dolibarr. Los productos y precios son de ejemplo, la tasa BCV es editable y "Finalizar pedido" no procesa ventas reales.
+</p>
+
+<div class="overlay" id="productOverlay"><div class="modal" id="productModal" role="dialog" aria-modal="true"></div></div>
+<div class="overlay" id="finishOverlay"><div class="modal" id="finishModal" role="dialog" aria-modal="true"></div></div>
+
+<script>
+/* =====================================================================
+   DATOS DE EJEMPLO
+   En Dolibarr: categorías = hijas de la raíz del TakePOS; productos = productos
+   de cada categoría; adicionales = productos de una categoría "Adicionales"
+   (se cobran); condiciones = texto que va en la descripción de la línea (no se cobran).
+   ===================================================================== */
+const EXTRAS = {
+  burger: [
+    {id:'queso', name:'Queso amarillo', price:0.75},
+    {id:'tocineta', name:'Tocineta', price:1.00},
+    {id:'huevo', name:'Huevo frito', price:0.75},
+    {id:'carne', name:'Carne extra', price:2.00},
+    {id:'jamon', name:'Jamón', price:0.50},
+    {id:'aguacate', name:'Aguacate', price:1.00}
+  ],
+  hotdog: [
+    {id:'queso-r', name:'Queso rallado', price:0.50},
+    {id:'tocineta-p', name:'Tocineta', price:0.75},
+    {id:'salchicha', name:'Salchicha extra', price:1.00},
+    {id:'papitas', name:'Papitas extra', price:0.50},
+    {id:'codorniz', name:'Huevos de codorniz', price:0.75}
+  ],
+  icecream: [
+    {id:'chispas', name:'Chispas de chocolate', price:0.50},
+    {id:'oreo', name:'Oreo triturada', price:0.50},
+    {id:'mani', name:'Maní', price:0.50},
+    {id:'sirope', name:'Sirope de chocolate', price:0.50},
+    {id:'bola', name:'Bola extra', price:1.00}
+  ],
+  dessert: [
+    {id:'helado', name:'Bola de helado', price:1.00},
+    {id:'chantilly', name:'Crema chantilly', price:0.50},
+    {id:'sirope-d', name:'Sirope de chocolate', price:0.50}
+  ]
+};
+
+const COND = {
+  burger: ['Sin cebolla','Sin ensalada','Sin tomate','Sin lechuga','Sin pepinillos','Sin salsas','Salsas aparte','Carne bien cocida'],
+  hotdog: ['Sin cebolla','Sin repollo','Sin papitas','Sin salsas','Sin mostaza','Salsas aparte'],
+  icecream: ['En vaso','Sin sirope'],
+  dessert: ['Para llevar en envase','Sin decoración']
+};
+
+const ICE_FLAVORS = ['Chocolate','Vainilla','Fresa','Mantecado','Ron con pasas','Coco','Parchita'];
+
+const CATEGORIES = [
+  {id:'burger', name:'Hamburguesas', icon:'🍔'},
+  {id:'hotdog', name:'Perros calientes', icon:'🌭'},
+  {id:'drink', name:'Refrescos', icon:'🥤'},
+  {id:'dessert', name:'Postres', icon:'🍰'},
+  {id:'icecream', name:'Helados', icon:'🍦'}
+];
+
+// direct: true → se agrega con un toque, sin ventana (como un refresco sin opciones)
+// choices: grupo obligatorio (ej. sabor del refresco o del helado)
+// maxExtras: límite de unidades de adicionales por producto (0 = sin límite)
+const PRODUCTS = [
+  {id:'h-clasica', cat:'burger', name:'Hamburguesa clásica', desc:'Carne 150g, queso, lechuga, tomate, cebolla y salsas', price:5.00, extras:'burger', cond:'burger'},
+  {id:'h-doble', cat:'burger', name:'Hamburguesa doble', desc:'Doble carne, doble queso y tocineta', price:7.50, extras:'burger', cond:'burger'},
+  {id:'h-pollo', cat:'burger', name:'Pollo crispy', desc:'Pechuga empanizada, lechuga, tomate y salsa de ajo', price:6.00, extras:'burger', cond:'burger'},
+  {id:'h-mixta', cat:'burger', name:'Hamburguesa mixta', desc:'Carne y pollo, jamón, queso y huevo', price:8.00, extras:'burger', cond:'burger'},
+  {id:'h-casa', cat:'burger', name:'De la casa', desc:'Carne 200g, queso de mano, plátano y tocineta', price:9.00, extras:'burger', cond:'burger'},
+
+  {id:'p-clasico', cat:'hotdog', name:'Perro clásico', desc:'Salchicha, repollo, cebolla, papitas y salsas', price:2.00, extras:'hotdog', cond:'hotdog', maxExtras:3},
+  {id:'p-especial', cat:'hotdog', name:'Perro especial', desc:'Con queso rallado y tocineta', price:3.00, extras:'hotdog', cond:'hotdog'},
+  {id:'p-jumbo', cat:'hotdog', name:'Perro jumbo', desc:'Salchicha jumbo con todo', price:4.00, extras:'hotdog', cond:'hotdog'},
+  {id:'p-polaco', cat:'hotdog', name:'Perro polaco', desc:'Salchicha polaca, cebolla caramelizada', price:4.50, extras:'hotdog', cond:'hotdog'},
+
+  {id:'r-lata', cat:'drink', name:'Refresco lata', desc:'355 ml', price:1.50, choices:{label:'Sabor', min:1, max:1, options:['Cola','Naranja','Limón','Uva','Colita']}},
+  {id:'r-15', cat:'drink', name:'Refresco 1,5 L', desc:'Para compartir', price:3.00, choices:{label:'Sabor', min:1, max:1, options:['Cola','Naranja','Limón','Uva','Colita']}},
+  {id:'r-agua', cat:'drink', name:'Agua mineral', desc:'600 ml', price:1.00, direct:true},
+  {id:'r-malta', cat:'drink', name:'Malta', desc:'Botella 250 ml', price:1.50, direct:true},
+  {id:'r-jugo', cat:'drink', name:'Jugo natural', desc:'Vaso 16 oz', price:2.50, choices:{label:'Fruta', min:1, max:1, options:['Naranja','Parchita','Fresa','Mora','Melón']}, cond:'juice'},
+
+  {id:'d-torta', cat:'dessert', name:'Torta de chocolate', desc:'Porción húmeda con fudge', price:3.00, extras:'dessert', cond:'dessert'},
+  {id:'d-quesillo', cat:'dessert', name:'Quesillo', desc:'Porción casera', price:2.50, extras:'dessert', cond:'dessert'},
+  {id:'d-brownie', cat:'dessert', name:'Brownie', desc:'Con nueces', price:2.50, extras:'dessert', cond:'dessert'},
+
+  {id:'i-barquilla', cat:'icecream', name:'Barquilla sencilla', desc:'1 bola en cono', price:2.00, extras:'icecream', cond:'icecream', choices:{label:'Sabor', min:1, max:1, options:ICE_FLAVORS}},
+  {id:'i-doble', cat:'icecream', name:'Barquilla doble', desc:'2 bolas en cono', price:3.00, extras:'icecream', cond:'icecream', choices:{label:'Sabores', min:1, max:2, options:ICE_FLAVORS}},
+  {id:'i-copa', cat:'icecream', name:'Copa de helado', desc:'3 bolas, crema y sirope', price:4.50, extras:'icecream', cond:'icecream', choices:{label:'Sabores', min:1, max:3, options:ICE_FLAVORS}},
+  {id:'i-batido', cat:'icecream', name:'Merengada', desc:'Batido de helado 16 oz', price:3.50, cond:'icecream', choices:{label:'Sabor', min:1, max:1, options:ICE_FLAVORS}}
+];
+COND.juice = ['Sin azúcar','Poca azúcar','Sin hielo'];
+
+/* =====================================================================
+   ESTADO
+   ===================================================================== */
+let cart = [];          // {uid, product, qty, choices[], conds[], extras{id:qty}, note}
+let current = null;     // edición en el modal
+let editingUid = null;  // si se está editando una línea existente
+let activeCat = CATEGORIES[0].id;
+let orderType = 'Comer aquí';
+let orderNumber = 101;
+let uidSeq = 1;
+
+const $ = (s) => document.querySelector(s);
+const fmtUsd = (n) => '$' + n.toFixed(2);
+const fmtBs = (n) => 'Bs ' + n.toLocaleString('es-VE', {minimumFractionDigits:2, maximumFractionDigits:2});
+const rate = () => parseFloat($('#bcvRate').value) || 0;
+const catOf = (p) => CATEGORIES.find(c => c.id === p.cat);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function extrasList(p){ return p.extras ? EXTRAS[p.extras] : []; }
+function condList(p){ return p.cond ? COND[p.cond] : []; }
+function extrasUnitTotal(p, extras){
+  return extrasList(p).reduce((s, e) => s + (extras[e.id] || 0) * e.price, 0);
+}
+function lineTotal(l){ return (l.product.price + extrasUnitTotal(l.product, l.extras)) * l.qty; }
+function extrasCount(extras){ return Object.values(extras).reduce((s, n) => s + n, 0); }
+
+/* =====================================================================
+   CATEGORÍAS Y PRODUCTOS
+   ===================================================================== */
+function renderCategories(){
+  const bar = $('#categories');
+  bar.innerHTML = CATEGORIES.map(c =>
+    `<button type="button" class="cat-btn ${c.id === activeCat ? 'active' : ''}" data-cat="${c.id}"><span class="ico">${c.icon}</span>${esc(c.name)}</button>`
+  ).join('');
+  bar.querySelectorAll('.cat-btn').forEach(b => b.onclick = () => { activeCat = b.dataset.cat; renderCategories(); renderGrid(); });
+}
+
+function renderGrid(){
+  const grid = $('#productGrid');
+  const list = PRODUCTS.filter(p => p.cat === activeCat);
+  grid.innerHTML = list.map(p => `
+    <button type="button" class="card" data-id="${p.id}">
+      ${p.direct ? '<span class="badge">1 toque</span>' : ''}
+      <div class="swatch">${catOf(p).icon}</div>
+      <h3>${esc(p.name)}</h3>
+      <p>${esc(p.desc)}</p>
+      <div class="price">${fmtUsd(p.price)}</div>
+    </button>`).join('');
+  grid.querySelectorAll('.card').forEach(card => card.onclick = () => {
+    const p = PRODUCTS.find(x => x.id === card.dataset.id);
+    if (p.direct) { addDirect(p); } else { openProduct(p); }
+  });
+}
+
+function addDirect(p){
+  // Si ya hay una línea igual sin personalizar, se suma la cantidad.
+  const same = cart.find(l => l.product.id === p.id);
+  if (same) { same.qty += 1; } else { cart.push({uid: uidSeq++, product:p, qty:1, choices:[], conds:[], extras:{}, note:''}); }
+  renderCart();
+  toast(`+1 ${p.name}`);
+}
+
+/* =====================================================================
+   VENTANA DE PERSONALIZACIÓN
+   ===================================================================== */
+function openProduct(p, line){
+  editingUid = line ? line.uid : null;
+  current = line
+    ? {product:p, qty:line.qty, choices:[...line.choices], conds:[...line.conds], extras:{...line.extras}, note:line.note}
+    : {product:p, qty:1, choices:[], conds:[], extras:{}, note:''};
+  renderModal();
+  $('#productOverlay').classList.add('open');
+}
+
+function closeProduct(){
+  $('#productOverlay').classList.remove('open');
+  current = null;
+  editingUid = null;
+}
+
+function renderModal(warning){
+  const p = current.product;
+  const ch = p.choices;
+  const extras = extrasList(p);
+  const conds = condList(p);
+  const maxEx = p.maxExtras || 0;
+  const usedEx = extrasCount(current.extras);
+  const unit = p.price + extrasUnitTotal(p, current.extras);
+
+  let body = '';
+
+  if (ch) {
+    const full = current.choices.length >= ch.max;
+    body += `<div class="section-label">${esc(ch.label)} <span class="count req">${ch.max === 1 ? 'elige 1 · obligatorio' : 'elige hasta ' + ch.max + ' · obligatorio'}</span></div>
+      <div class="chips">${ch.options.map(o => {
+        const sel = current.choices.includes(o);
+        const dis = !sel && full && ch.max > 1;
+        return `<button type="button" class="chip ${sel ? 'selected' : ''} ${dis ? 'disabled' : ''}" data-choice="${esc(o)}">${esc(o)}</button>`;
+      }).join('')}</div>`;
+  }
+
+  if (conds.length) {
+    body += `<div class="section-label">Condiciones especiales <span class="count">no se cobran · van a cocina</span></div>
+      <div class="chips">${conds.map(c =>
+        `<button type="button" class="chip cond ${current.conds.includes(c) ? 'selected' : ''}" data-cond="${esc(c)}">${esc(c)}</button>`
+      ).join('')}</div>`;
+  }
+
+  if (extras.length) {
+    body += `<div class="section-label">Adicionales <span class="count">${maxEx ? `por unidad · máx. ${maxEx} (${usedEx}/${maxEx})` : 'por unidad · se cobran aparte'}</span></div>
+      <div class="extras">${extras.map(e => {
+        const q = current.extras[e.id] || 0;
+        const blocked = maxEx && usedEx >= maxEx;
+        return `<div class="extra-row ${q ? 'on' : ''}">
+          <div><div class="extra-name">${esc(e.name)}</div><div class="extra-price">+ ${fmtUsd(e.price)}</div></div>
+          <div class="stepper">
+            <button type="button" class="step-btn" data-ex-minus="${e.id}" ${q ? '' : 'disabled'} aria-label="Quitar ${esc(e.name)}">−</button>
+            <span class="step-val">${q}</span>
+            <button type="button" class="step-btn" data-ex-plus="${e.id}" ${blocked ? 'disabled' : ''} aria-label="Agregar ${esc(e.name)}">+</button>
+          </div>
+        </div>`;
+      }).join('')}</div>`;
+  }
+
+  body += `<div class="section-label">Nota para cocina <span class="count">opcional</span></div>
+    <input class="note-input" id="noteInput" maxlength="120" placeholder="Ej: salsa de ajo aparte, cortar a la mitad…" value="${esc(current.note)}">`;
+
+  $('#productModal').innerHTML = `
+    <div class="modal-head">
+      <div class="emoji">${catOf(p).icon}</div>
+      <div>
+        <h2 class="display">${esc(p.name)}</h2>
+        <div class="modal-sub">${esc(p.desc)} · ${fmtUsd(p.price)}</div>
+      </div>
+    </div>
+    <div class="modal-body">${body}</div>
+    <div class="modal-foot">
+      <div class="qty-row">
+        <button type="button" class="step-btn" id="qtyMinus" aria-label="Menos">−</button>
+        <span class="step-val" id="qtyVal">${current.qty}</span>
+        <button type="button" class="step-btn" id="qtyPlus" aria-label="Más">+</button>
+        <div class="preview">
+          <div class="big">${fmtUsd(unit * current.qty)}</div>
+          <div class="small">${current.qty > 1 ? fmtUsd(unit) + ' c/u · ' : ''}${fmtBs(unit * current.qty * rate())}</div>
+        </div>
+      </div>
+      <div class="warn" id="modalWarn">${warning ? esc(warning) : ''}</div>
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="cancelProduct">Cancelar</button>
+        <button type="button" class="btn-primary" id="addProduct">${editingUid ? 'Guardar cambios' : 'Agregar al pedido'}</button>
+      </div>
+    </div>`;
+
+  const m = $('#productModal');
+  const keepNote = () => { const n = $('#noteInput'); if (n) current.note = n.value; };
+
+  m.querySelectorAll('[data-choice]').forEach(b => b.onclick = () => {
+    keepNote();
+    const v = b.dataset.choice, i = current.choices.indexOf(v);
+    if (i > -1) current.choices.splice(i, 1);
+    else if (ch.max === 1) current.choices = [v];
+    else if (current.choices.length < ch.max) current.choices.push(v);
+    renderModal();
+  });
+  m.querySelectorAll('[data-cond]').forEach(b => b.onclick = () => {
+    keepNote();
+    const v = b.dataset.cond, i = current.conds.indexOf(v);
+    if (i > -1) current.conds.splice(i, 1); else current.conds.push(v);
+    renderModal();
+  });
+  m.querySelectorAll('[data-ex-plus]').forEach(b => b.onclick = () => {
+    keepNote();
+    const id = b.dataset.exPlus;
+    if (maxEx && extrasCount(current.extras) >= maxEx) return;
+    current.extras[id] = (current.extras[id] || 0) + 1;
+    renderModal();
+  });
+  m.querySelectorAll('[data-ex-minus]').forEach(b => b.onclick = () => {
+    keepNote();
+    const id = b.dataset.exMinus;
+    current.extras[id] = Math.max(0, (current.extras[id] || 0) - 1);
+    if (!current.extras[id]) delete current.extras[id];
+    renderModal();
+  });
+  $('#qtyMinus').onclick = () => { keepNote(); current.qty = Math.max(1, current.qty - 1); renderModal(); };
+  $('#qtyPlus').onclick = () => { keepNote(); current.qty += 1; renderModal(); };
+  $('#cancelProduct').onclick = closeProduct;
+  $('#addProduct').onclick = () => { keepNote(); confirmProduct(); };
+}
+
+function confirmProduct(){
+  const p = current.product;
+  if (p.choices && current.choices.length < p.choices.min) {
+    renderModal(`Elige ${p.choices.label.toLowerCase()} antes de agregar.`);
+    return;
+  }
+  const data = {
+    product: p,
+    qty: current.qty,
+    // Mantener el orden en que aparecen en la lista
+    choices: p.choices ? p.choices.options.filter(o => current.choices.includes(o)) : [],
+    conds: condList(p).filter(c => current.conds.includes(c)),
+    extras: {...current.extras},
+    note: current.note.trim()
+  };
+  if (editingUid) {
+    const idx = cart.findIndex(l => l.uid === editingUid);
+    cart[idx] = {uid: editingUid, ...data};
+    toast('Cambios guardados');
+  } else {
+    cart.push({uid: uidSeq++, ...data});
+    toast(`Agregado: ${p.name}`);
+  }
+  closeProduct();
+  renderCart();
+}
+
+/* =====================================================================
+   PEDIDO ACTUAL
+   ===================================================================== */
+function renderCart(){
+  const linesEl = $('#cartLines');
+  $('#orderNo').textContent = `Pedido #${orderNumber} · ${orderType}`;
+
+  if (!cart.length) {
+    linesEl.innerHTML = `<div class="empty-cart"><div class="bubble">¿Qué vas a pedir hoy?</div><div>Toca un producto para armar el pedido.</div></div>`;
+  } else {
+    linesEl.innerHTML = cart.slice().reverse().map(l => {
+      const p = l.product;
+      const exHtml = extrasList(p).filter(e => l.extras[e.id]).map(e =>
+        `<div class="line-extra"><span>+ ${esc(e.name)}${l.extras[e.id] > 1 ? ' x' + l.extras[e.id] : ''}</span><span>${fmtUsd(e.price * l.extras[e.id] * l.qty)}</span></div>`
+      ).join('');
+      const editable = !p.direct;
+      return `<div class="line">
+        <div class="line-top">
+          <div>
+            <strong>${l.qty}x ${esc(p.name)}</strong>
+            ${l.choices.length ? `<div class="line-extra"><span>${esc(l.choices.join(', '))}</span></div>` : ''}
+            ${l.conds.length ? `<div class="line-cond">${esc(l.conds.join(' · '))}</div>` : ''}
+            ${exHtml}
+            ${l.note ? `<div class="line-note">“${esc(l.note)}”</div>` : ''}
+          </div>
+          <div class="line-right">
+            <div class="line-total">${fmtUsd(lineTotal(l))}</div>
+            <div class="line-actions">
+              ${editable ? `<button type="button" class="line-edit" data-edit="${l.uid}">Editar</button>` : ''}
+              <button type="button" class="line-remove" data-remove="${l.uid}">Quitar</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    linesEl.querySelectorAll('[data-remove]').forEach(b => b.onclick = () => {
+      cart = cart.filter(l => l.uid !== Number(b.dataset.remove));
+      renderCart();
+    });
+    linesEl.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
+      const l = cart.find(x => x.uid === Number(b.dataset.edit));
+      setMobileCart(false);
+      openProduct(l.product, l);
+    });
+  }
+
+  const items = cart.reduce((s, l) => s + l.qty, 0);
+  const total = cart.reduce((s, l) => s + lineTotal(l), 0);
+  $('#itemCount').textContent = items;
+  $('#totalUsd').textContent = fmtUsd(total);
+  $('#totalBs').textContent = fmtBs(total * rate());
+  $('#finishBtn').disabled = !cart.length;
+  $('#mobileCartLabel').textContent = cart.length ? `Ver pedido · ${items} ${items === 1 ? 'artículo' : 'artículos'}` : 'Pedido vacío';
+  $('#mobileCartTotal').textContent = fmtUsd(total);
+}
+
+/* =====================================================================
+   FINALIZAR: comanda para cocina + resumen
+   En Dolibarr este botón cierra el popup y deja el pedido en el ticket
+   del TakePOS, listo para cobrar e imprimir.
+   ===================================================================== */
+function finishOrder(){
+  const total = cart.reduce((s, l) => s + lineTotal(l), 0);
+  const now = new Date().toLocaleTimeString('es-VE', {hour:'2-digit', minute:'2-digit'});
+  const ticket = cart.map(l => {
+    const p = l.product;
+    let t = `<div class="t-line"><b>${l.qty} x ${esc(p.name.toUpperCase())}</b>`;
+    if (l.choices.length) t += `<div class="t-sub">${esc(l.choices.join(', '))}</div>`;
+    l.conds.forEach(c => { t += `<div class="t-cond">** ${esc(c.toUpperCase())} **</div>`; });
+    extrasList(p).filter(e => l.extras[e.id]).forEach(e => { t += `<div class="t-sub">+ ${esc(e.name)} x${l.extras[e.id] * l.qty}</div>`; });
+    if (l.note) t += `<div class="t-sub">Nota: ${esc(l.note)}</div>`;
+    return t + '</div>';
+  }).join('');
+
+  $('#finishModal').innerHTML = `
+    <div class="modal-body" style="padding-top:18px;">
+      <div class="check-circle">✓</div>
+      <h2 class="display" style="text-align:center;margin:0;">Pedido #${orderNumber} listo</h2>
+      <div class="modal-sub" style="text-align:center;">${esc(orderType)} · Total ${fmtUsd(total)} · ${fmtBs(total * rate())}</div>
+      <div class="ticket">
+        <div class="t-head">COMANDA COCINA<br>Pedido #${orderNumber} · ${esc(orderType.toUpperCase())} · ${now}</div>
+        ${ticket}
+      </div>
+    </div>
+    <div class="modal-foot">
+      <div class="modal-actions" style="margin-top:0;">
+        <button type="button" class="btn-ghost" id="backToOrder">Volver al pedido</button>
+        <button type="button" class="btn-primary" id="newOrder">Nuevo pedido</button>
+      </div>
+    </div>`;
+  $('#backToOrder').onclick = () => $('#finishOverlay').classList.remove('open');
+  $('#newOrder').onclick = () => {
+    cart = [];
+    orderNumber += 1;
+    $('#finishOverlay').classList.remove('open');
+    setMobileCart(false);
+    renderCart();
+  };
+  $('#finishOverlay').classList.add('open');
+}
+
+/* =====================================================================
+   VARIOS
+   ===================================================================== */
+function toast(msg){
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 1400);
+}
+
+const cartPanel = $('#cartPanel');
+const mobileToggle = $('#mobileCartToggle');
+function setMobileCart(open){
+  cartPanel.classList.toggle('mobile-open', open);
+  mobileToggle.setAttribute('aria-expanded', String(open));
+}
+mobileToggle.onclick = () => setMobileCart(true);
+$('#mobileCartClose').onclick = () => setMobileCart(false);
+window.addEventListener('resize', () => { if (!window.matchMedia('(max-width: 760px)').matches) setMobileCart(false); });
+
+$('#bcvRate').addEventListener('input', () => { renderCart(); if (current) renderModal(); });
+$('#clearCart').onclick = () => { if (!cart.length || confirm('¿Vaciar el pedido actual?')) { cart = []; renderCart(); } };
+$('#finishBtn').onclick = finishOrder;
+document.querySelectorAll('#orderType button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#orderType button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  orderType = b.dataset.type;
+  renderCart();
+});
+document.querySelectorAll('.overlay').forEach(ov => ov.addEventListener('click', (e) => {
+  if (e.target === ov) { if (ov.id === 'productOverlay') closeProduct(); else ov.classList.remove('open'); }
+}));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeProduct(); $('#finishOverlay').classList.remove('open'); }
+});
+
+renderCategories();
+renderGrid();
+renderCart();
+</script>
+</body>
+</html>
